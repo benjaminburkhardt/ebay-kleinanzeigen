@@ -12,9 +12,9 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 
 import utils
 
-jobstores = {
-    'default': SQLAlchemyJobStore(url='sqlite:///jobs.sqlite')
-}
+# jobstores = {
+#     'default': SQLAlchemyJobStore(url='sqlite:///jobs.sqlite')
+# }
 # TODO: re-enable SQLite storage for persistency
 # scheduler = BackgroundScheduler(jobstores=jobstores)
 scheduler = BackgroundScheduler()
@@ -86,6 +86,14 @@ def get_items_per_url(url):
         if prices := re.findall(r'\d+', price_line, re.S):
             price = int(prices[0])
 
+#        try:
+#            test = re.findall('icon icon-smaller icon-feature-topad.*?</i>(.*?)</', item, re.S)[0].strip()
+#            log.info("werbung")
+#            continue
+#        except Exception as e:
+#            # If there is no feattured OK  - it's some highlighted/"top" item
+#            log.info("normlaler eintrag")
+
         date = datetime.datetime.now()
         try:
             date = re.findall('icon icon-small icon-calendar-open.*?</i>(.*?)</', item, re.S)[0].strip()
@@ -95,7 +103,7 @@ def get_items_per_url(url):
                 date = datetime.datetime.now() - datetime.timedelta(days=1)
         except Exception as e:
             # If there is no date - it's some highlighted/"top" item
-            pass
+            continue
 
         try:
             image = re.findall('imgsrc="(.*?)"', item, re.S)[0].strip()
@@ -132,13 +140,16 @@ def echo(update: Update, context):
 
     if chat_id not in last_items:
         # Nothing here, schedule
-        scheduler.add_job(echo, trigger='interval', args=(update, context), minutes=15, id=str(chat_id))
+        scheduler.add_job(echo, trigger='interval', args=(update, context), minutes=1, id=str(chat_id))
         log.info('Scheduled job')
         last_items[chat_id] = {'last_item': None, 'url': url}
 
     log.info("Get items")
     items = get_items_per_url(url)
     for item in items:
+        log.info(chat_id)
+        log.info(last_items[chat_id]['last_item'])
+        log.info(item.url)
         if chat_id in last_items and item.url == last_items[chat_id]['last_item']:
             # log.info('Breaking the loop')
             break
