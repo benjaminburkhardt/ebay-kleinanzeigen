@@ -22,6 +22,7 @@ scheduler = BackgroundScheduler()
 scheduler.start()
 
 last_items = {}
+INTERVAL_MINS = 10
 
 logger = utils.get_logger()
 
@@ -39,13 +40,13 @@ class Item:
         self.image = image
 
     def __repr__(self):
-        return f'{self.title} - {self.price} - {self.date}'
+        return f'{self.title} \n {self.price}€ \n {self.date}'
 
     def __str__(self):
-        result = f'{self.title} - {self.price}'
+        result = f'{self.title} \n{self.price}.000€'
         if self.torg:
             result += ' VB'
-        result += f'\n\t{self.date}\n'
+        result += f'\n{self.date}\n'
 
         result += self.url
         result += '\n'
@@ -89,7 +90,7 @@ def get_items_per_url(url):
         price = None
         if prices := re.findall(r'\d+', price_line, re.S):
             price = int(prices[0])
-
+# Checking if article is a "TOP" article/ad, currently evaluating, but probably identifiying by price is enough
 #        try:
 #            test = re.findall('icon icon-smaller icon-feature-topad.*?</i>(.*?)</', item, re.S)[0].strip()
 #            log.info("werbung")
@@ -107,6 +108,7 @@ def get_items_per_url(url):
                 date = datetime.datetime.now() - datetime.timedelta(days=1)
         except Exception as e:
             # If there is no date - it's some highlighted/"top" item
+            log.info("Skipped ad..")
             continue
 
         try:
@@ -114,9 +116,7 @@ def get_items_per_url(url):
         except Exception as e:
             logger.error(f'No image\n\t{item}')
             continue
-        log.info("image: " + image)
-        log.info("URL " + url)
-        log.info("Title " + name)
+        log.info("Found & added URL: " + url)
         items.append(Item(name, price, torg, url, date, image))
     return items
 
@@ -125,8 +125,8 @@ def start(update, context):
     """Send a message when the command /start is issued."""
     log = utils.get_logger()
     log.info('Start')
-    update.message.reply_text('Hi!')
-
+    update.message.reply_text('Send me a search url, for example:')
+    update.message.reply_text('https://www.ebay-kleinanzeigen.de/s-wohnwagen-mobile/anzeige:angebote/preis:15000:35000/c220+wohnwagen_mobile.ez_i:2005%2C')
 
 def error(update, context):
     """Log Errors caused by Updates."""
@@ -144,23 +144,21 @@ def echo(update: Update, context):
 
     if chat_id not in last_items:
         # Nothing here, schedule
-        scheduler.add_job(echo, trigger='interval', args=(update, context), minutes=1, id=str(chat_id))
+        print(INTERVAL_MINS)
+        scheduler.add_job(echo, trigger='interval', args=(update, context), minutes=INTERVAL_MINS, id=str(chat_id))
         log.info('Scheduled job')
         last_items[chat_id] = {'last_item': None, 'url': url}
 
     log.info("Get items")
     items = get_items_per_url(url)
     for item in items:
-        log.info(chat_id)
-        log.info(last_items[chat_id]['last_item'])
-        log.info(item.url)
         if chat_id in last_items and item.url == last_items[chat_id]['last_item']:
-            # log.info('Breaking the loop')
+            log.info('Last item, breaking the loop...')
             break
         msg.reply_text(str(item))
         # update.message.reply_photo(item.image)
     last_items[chat_id] = {'last_item': items[0].url, 'search_url': url}
-
+    log.info(last_items)
 
 def main():
     """Start the bot."""
@@ -169,16 +167,20 @@ def main():
     # Post version 12 this will no longer be necessary
     
     # Read arguments
-	parser.add_argument('token', type=string,
+    parser.add_argument('--token', type=ascii,
                     help='Telegram token for bot')
+    parser.add_argument('--opt_minutes', type=int,
+                    help='Check ebay each x minutes')
     args = parser.parse_args()
-    log.info("Argument values:")
-    log.info(args.pos_arg)
-    log.info(args.opt_pos_arg)
-    log.info(args.opt_arg)
-    log.info(args.switch)
+    
+    BOT_TOKEN = str(args.token.strip('\''))
+    global INTERVAL_MINS
+    if args.opt_minutes:
+        INTERVAL_MINS = args.opt_minutes
 
-    updater = Updater(bot=utils.get_bot(), use_context=True)
+    print("Checking each " + str(INTERVAL_MINS) + " min")
+    
+    updater = Updater(bot=utils.get_bot(BOT_TOKEN), use_context=True)
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
@@ -188,25 +190,11 @@ def main():
     dp.add_error_handler(error)
 
     # Start the Bot
-    DEBUG = True if os.getenv("DEBUG") else False
-    BOT_TOKEN = os.getenv("TG_TOKEN")
-    if DEBUG:
-        updater.start_polling()
-        # Run the bot until you press Ctrl-C or the process receives SIGINT,
-        # SIGTERM or SIGABRT. This should be used most of the time, since
-        # start_polling() is non-blocking and will stop the bot gracefully.
-        updater.idle()
-    else:
-        logger.info('Starting bot in production webhook mode')
-        HOST_URL = os.environ.get("HOST_URL")
-        if HOST_URL is None:
-            logger.critical('HOST URL is not set!')
-            sys.exit(-1)
-        updater.start_webhook(listen="0.0.0.0",
-                              port='8443',
-                              url_path=BOT_TOKEN)
-        updater.bot.set_webhook("https://{}/{}".format(HOST_URL, BOT_TOKEN))
-
+    updater.start_polling()
+    # Run the bot until you press Ctrl-C or the process receives SIGINT,
+    # SIGTERM or SIGABRT. This should be used most of the time, since
+    # start_polling() is non-blocking and will stop the bot gracefully.
+    updater.idle()
 
 if __name__ == '__main__':
     main()
