@@ -2,6 +2,7 @@ import datetime
 import os
 import re
 import sys
+import argparse
 
 import requests
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
@@ -23,6 +24,9 @@ scheduler.start()
 last_items = {}
 
 logger = utils.get_logger()
+
+# Instantiate the parser
+parser = argparse.ArgumentParser(description='Telegram bot to notify about new articles')
 
 
 class Item:
@@ -163,6 +167,16 @@ def main():
     # Create the Updater and pass it your bot's token.
     # Make sure to set use_context=True to use the new context based callbacks
     # Post version 12 this will no longer be necessary
+    
+    # Read arguments
+	parser.add_argument('token', type=string,
+                    help='Telegram token for bot')
+    args = parser.parse_args()
+    log.info("Argument values:")
+    log.info(args.pos_arg)
+    log.info(args.opt_pos_arg)
+    log.info(args.opt_arg)
+    log.info(args.switch)
 
     updater = Updater(bot=utils.get_bot(), use_context=True)
     dp = updater.dispatcher
