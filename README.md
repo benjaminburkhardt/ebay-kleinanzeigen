@@ -19,9 +19,14 @@ such a case.
 Python 3.6+ and Docker (preferrably)
  
  ### Manual
-The bot can be run in webhook and polling modes. For webhook, bot has to be accessible over HTTPS from external Internet.
- 
-Commands for running:
+
+- Install requirements
+- Get Telegram TOKEN
+- Run bot in screen so you can detach from it:
+-     screen -d -m python3 main.py --token <your token> --opt_minutes <minutes to refresh>
+
+
+Commands for running in docker:
 
     git pull
     docker-compose build
