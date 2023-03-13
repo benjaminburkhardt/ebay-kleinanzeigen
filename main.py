@@ -24,6 +24,7 @@ scheduler.start()
 
 last_items_kleinanzeigen = {}
 last_items_mobile = {}
+tag = ""
 INTERVAL_MINS = 10
 
 logger = utils.get_logger()
@@ -207,7 +208,6 @@ def get_items_per_url_mobilede(url):
             continue
 
         # Tag
-        tag = ""
         try:
             tag = re.findall('simpletag tag-small">(.*?)</', item, re.S)[0].strip()
         except Exception as e:
