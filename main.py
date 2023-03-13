@@ -207,6 +207,7 @@ def get_items_per_url_mobilede(url):
             continue
 
         # Tag
+        tag = ""
         try:
             tag = re.findall('simpletag tag-small">(.*?)</', item, re.S)[0].strip()
         except Exception as e:
