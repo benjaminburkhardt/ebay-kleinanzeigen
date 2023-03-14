@@ -26,8 +26,19 @@ last_items_kleinanzeigen = {}
 last_items_mobile = {}
 INTERVAL_MINS = 10
 
+# Pre-configured query urls
+womo_urls = [
+    'https://www.ebay-kleinanzeigen.de/s-wohnwagen-mobile/anzeige:angebote/preis:15000:35000/c220+wohnwagen_mobile.art_s:alkoven+wohnwagen_mobile.ez_i:2005%2C'
+    ,
+    'https://www.ebay-kleinanzeigen.de/s-wohnwagen-mobile/anzeige:angebote/preis:15000:35000/c220+wohnwagen_mobile.art_s:kastenwagen+wohnwagen_mobile.ez_i:2005%2C'
+    ,
+    'https://www.ebay-kleinanzeigen.de/s-wohnwagen-mobile/anzeige:angebote/preis:15000:35000/c220+wohnwagen_mobile.art_s:integrierter+wohnwagen_mobile.ez_i:2005%2C'
+    ,
+    'https://www.ebay-kleinanzeigen.de/s-wohnwagen-mobile/anzeige:angebote/preis:15000:35000/c220+wohnwagen_mobile.art_s:teilintegrierter+wohnwagen_mobile.ez_i:2005%2C']
+
 logger = utils.get_logger()
 parser = argparse.ArgumentParser(description='Telegram bot to notify about new articles')
+
 
 class Item:
     def __init__(self, title, price, torg, url, date, image, tag):
@@ -46,15 +57,17 @@ class Item:
         result = f'{self.title} \n{self.price}.000€'
         if self.torg:
             result += ' VB'
-        #result += f'\n{self.date}\n'
+        # result += f'\n{self.date}\n'
         result += f'\n{self.tag}\n'
         result += self.url
         result += '\n'
         return result
 
+
 class Website(Enum):
     KLEINANZEIGEN = 1
     MOBILEDE = 2
+
 
 def is_womo(item: Item):
     if "wohnwagen" in item.title.lower():
@@ -66,6 +79,7 @@ def is_womo(item: Item):
     elif "vorzelt" in item.title.lower():
         return False
     return True
+
 
 def get_items_per_url_kleinanzeigen(url):
     log = utils.get_logger()
@@ -105,7 +119,7 @@ def get_items_per_url_kleinanzeigen(url):
         else:
             continue
 
-        #Price
+        # Price
         price_line = re.findall('aditem-main--middle--price.*?>(.*?)</p>', item, re.S)
         if len(price_line) > 0:
             price_line = price_line[0]
@@ -142,9 +156,10 @@ def get_items_per_url_kleinanzeigen(url):
         except Exception as e:
             logger.error(f'No image\n\t{item}')
             continue
-        log.info("Found & added URL: " + url)
+        # log.info("Found & added URL: " + url)
         items.append(Item(name, price, torg, url, date, image, tag))
     return items
+
 
 def get_items_per_url_mobilede(url):
     # TODO: mobile.de blocks using CAPTCHAs :(
@@ -161,7 +176,7 @@ def get_items_per_url_mobilede(url):
     print(text)
 
     articles = re.findall('link--muted no--text--decoration result-item(.*?)</a', text, re.S)
-    #articles = re.findall('<article(.*?)</article', text, re.S)
+    # articles = re.findall('<article(.*?)</article', text, re.S)
     log.info(f"Articles length {len(articles)}")
     items = []
     for item in articles:
@@ -189,7 +204,7 @@ def get_items_per_url_mobilede(url):
         else:
             continue
 
-        #Price
+        # Price
         price_line = re.findall('aditem-main--middle--price.*?>(.*?)</p>', item, re.S)
         if len(price_line) > 0:
             price_line = price_line[0]
@@ -225,20 +240,33 @@ def get_items_per_url_mobilede(url):
         except Exception as e:
             logger.error(f'No image\n\t{item}')
             continue
-        log.info("Found & added URL: " + url)
         items.append(Item(name, price, torg, url, date, image, tag))
     return items
+
+
+def trigger_search_for_womos(update, context):
+    msg: Message = update.message
+    log = utils.get_logger()
+    log.info('func womos')
+    for url in womo_urls:
+        update.message.text = url
+        echo(update, context)
+    update.message.reply_text('Started 4 queries for: Alkoven, Integriert, TI, Kastewagen.')
+
 
 def start(update, context):
     """Send a message when the command /start is issued."""
     log = utils.get_logger()
     log.info('Start')
     update.message.reply_text('Send me a search url, for example:')
-    update.message.reply_text('https://www.ebay-kleinanzeigen.de/s-wohnwagen-mobile/anzeige:angebote/preis:15000:35000/c220+wohnwagen_mobile.ez_i:2005%2C')
-    update.message.reply_text('https://suchen.mobile.de/fahrzeuge/search.html?cn=DE&isSearchRequest=true&od=down&p=15000%3A35000&s=Motorhome&sb=doc&vc=Motorhome')
+    update.message.reply_text(
+        'https://www.ebay-kleinanzeigen.de/s-wohnwagen-mobile/anzeige:angebote/preis:15000:35000/c220+wohnwagen_mobile.ez_i:2005%2C')
+
+
 def error(update, context):
     """Log Errors caused by Updates."""
     print('Update "%s" caused error "%s"', update, context.error)
+
 
 def echo(update: Update, context):
     msg: Message = update.message
@@ -247,6 +275,8 @@ def echo(update: Update, context):
     log.info('Started echo')
 
     url = update.message.text
+    log.info("URL: " + url)
+
     chat_id = update.effective_chat.id
 
     if "ebay-kleinanzeigen" in url:
@@ -260,13 +290,13 @@ def echo(update: Update, context):
         msg.reply_text("Invalid URL")
         return
     log.info("last_items_kleinanzeigen: " + str(last_items_kleinanzeigen))
-    log.info("last_items_mobile: " + str(last_items_mobile))
 
-    if chat_id not in last_items:
+    identifier = str(chat_id) + url.lower()
+    if identifier not in last_items:
         # Nothing here, schedule
-        scheduler.add_job(echo, trigger='interval', args=(update, context), minutes=INTERVAL_MINS, id=str(chat_id))
+        scheduler.add_job(echo, trigger='interval', args=(update, context), minutes=INTERVAL_MINS, id=str(identifier))
         log.info('Scheduled job')
-        last_items[chat_id] = {'last_item': None, 'url': url}
+        last_items[identifier] = {'last_item': None, 'url': url}
 
     if site == Website.KLEINANZEIGEN:
         items = get_items_per_url_kleinanzeigen(url)
@@ -274,16 +304,17 @@ def echo(update: Update, context):
         items = get_items_per_url_mobilede(url)
 
     for item in items:
-        if chat_id in last_items and item.url == last_items[chat_id]['last_item']:
-            log.info('Found last item, breaking the loop...')
+        if identifier in last_items and item.url == last_items[identifier]['last_item']:
+            # log.info('Found last item, breaking the loop...')
             break
         if is_womo(item):
             msg.reply_text(str(item))
             # update.message.reply_photo(item.image)
         else:
             log.info("Skipped non womo: " + item.title)
-    last_items[chat_id] = {'last_item': items[0].url, 'search_url': url}
+    last_items[identifier] = {'last_item': items[0].url, 'search_url': url}
     log.info(last_items)
+
 
 def main():
     """Start the bot."""
@@ -309,6 +340,7 @@ def main():
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("womos", trigger_search_for_womos))
     dp.add_handler(MessageHandler(Filters.text, echo))
 
     # log all errors
@@ -320,6 +352,7 @@ def main():
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
     updater.idle()
+
 
 if __name__ == '__main__':
     main()
