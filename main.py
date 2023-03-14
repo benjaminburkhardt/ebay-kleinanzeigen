@@ -57,7 +57,13 @@ class Website(Enum):
     MOBILEDE = 2
 
 def is_womo(item: Item):
-    if "Wohnwagen" in item.title:
+    if "wohnwagen" in item.title.lower():
+        return False
+    elif "mover" in item.title.lower():
+        return False
+    elif "moover" in item.title.lower():
+        return False
+    elif "vorzelt" in item.title.lower():
         return False
     return True
 
